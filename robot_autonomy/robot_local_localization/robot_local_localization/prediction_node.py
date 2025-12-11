@@ -4,14 +4,12 @@ from geometry_msgs.msg import Twist, PoseStamped
 from nav_msgs.msg import Odometry, Path
 import numpy as np
 import tf_transformations
-import tf2_ros
-from geometry_msgs.msg import TransformStamped
+
 
 class PredictionNode(Node):
     def __init__(self):
         super().__init__('prediction_node')
 
-        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
 
         self.declare_parameter('wheel_separation', 0.45)
         self.declare_parameter('wheel_radius', 0.1)
@@ -106,24 +104,6 @@ class PredictionNode(Node):
         ])
         
         self.P = F @ self.P @ F.T + Q
-
-        # انتشار TF (تبدیل odom به base_link)
-        t = TransformStamped()
-        t.header.stamp = self.get_clock().now().to_msg()
-        t.header.frame_id = 'odom' 
-        t.child_frame_id = 'base_link' # تغییر داده شد
-
-        t.transform.translation.x = self.x
-        t.transform.translation.y = self.y
-        t.transform.translation.z = 0.0
-
-        quaternion = tf_transformations.quaternion_from_euler(0, 0, self.theta)
-        t.transform.rotation.x = quaternion[0]
-        t.transform.rotation.y = quaternion[1]
-        t.transform.rotation.z = quaternion[2]
-        t.transform.rotation.w = quaternion[3]
-
-        self.tf_broadcaster.sendTransform(t)
 
         # انتشار Odometry
         odom_msg = self.create_odometry_message()
