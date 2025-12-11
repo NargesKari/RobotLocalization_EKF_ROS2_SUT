@@ -72,7 +72,9 @@ class MeasurementNode(Node):
         meas.header.frame_id = self.odom_frame
         meas.child_frame_id = self.base_frame
 
-        meas.pose.pose.position = msg.pose.pose.position
+        meas.pose.pose.position.x = msg.pose.pose.position.x
+        meas.pose.pose.position.y = msg.pose.pose.position.y
+        meas.pose.pose.position.z = 0.0
 
         q = self.yaw_to_quaternion(self.last_imu_yaw)
         meas.pose.pose.orientation = q

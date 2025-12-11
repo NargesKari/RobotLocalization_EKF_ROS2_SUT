@@ -142,6 +142,23 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    path_tracker_node= Node(
+        package='robot_local_localization',
+        executable='path_tracker_node',
+        name='path_tracker_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+    
+    ekf_node= Node(
+        package='robot_local_localization',
+        executable='ekf_node',
+        name='ekf_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+    
+
     rtabmap_vo_node = Node(
         package="rtabmap_odom",
         executable="rgbd_odometry",
@@ -178,5 +195,8 @@ def generate_launch_description():
         motor_controller_node,
         motor_command_node,
         prediction_node,
-        measurement_node
+        measurement_node,
+        ekf_node,
+        path_tracker_node,
+
     ])

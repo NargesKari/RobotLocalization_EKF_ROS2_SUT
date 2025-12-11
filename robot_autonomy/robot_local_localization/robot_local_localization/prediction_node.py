@@ -1,22 +1,24 @@
+#!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, PoseStamped
+from geometry_msgs.msg import Twist, PoseStamped, Quaternion
 from nav_msgs.msg import Odometry, Path
 import numpy as np
 import tf_transformations
-
+import math
+from typing import List
 
 class PredictionNode(Node):
+    
     def __init__(self):
         super().__init__('prediction_node')
-
 
         self.declare_parameter('wheel_separation', 0.45)
         self.declare_parameter('wheel_radius', 0.1)
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
-        self.declare_parameter('rate', 100.0) # افزایش نرخ برای دقت بیشتر
-        self.declare_parameter('process_noise_v', 0.05)
-        self.declare_parameter('process_noise_w', 0.05)
+        self.declare_parameter('rate', 100.0)
+        self.declare_parameter('process_noise_v', 0.01)
+        self.declare_parameter('process_noise_w', 0.01)
 
         self.wheel_separation = self.get_parameter('wheel_separation').get_parameter_value().double_value
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
@@ -40,36 +42,28 @@ class PredictionNode(Node):
             Twist,
             self.cmd_vel_topic,
             self.cmd_vel_callback,
-            10 # QoS
+            10
         )
         
-        # ناشر Odometry
         self.prediction_pub = self.create_publisher(Odometry, '/ekf/motion_model', 10) 
         
-        # ناشر Path (مسیر) - جدید
-        self.path_pub = self.create_publisher(Path, '/ekf/path', 10) 
+        self.path_pub = self.create_publisher(Path, '/ekf/prediction_path', 10) 
         self.path_msg = Path()
         self.path_msg.header.frame_id = 'odom'
         
         self.timer = self.create_timer(self.dt, self.prediction_update)
-        self.get_logger().info('Prediction Node started.')
 
 
     def cmd_vel_callback(self, msg):
-        """دریافت آخرین فرمان سرعت (v, w) از cmd_vel"""
         self.last_v = msg.linear.x
         self.last_w = msg.angular.z
-        
-        self.get_logger().info(f'Received Cmd_Vel: v={self.last_v:.2f}, w={self.last_w:.2f}')
 
     def prediction_update(self):
-        """اجرای گام پیش‌بینی EKF (مدل حرکت)"""
         
         v = self.last_v
         w = self.last_w
         dt = self.dt
         
-        # محاسبه تغییرات موقعیت (مدل دیفرانسیل)
         if abs(w) < 1e-6:
             delta_x = v * dt * np.cos(self.theta)
             delta_y = v * dt * np.sin(self.theta)
@@ -80,9 +74,8 @@ class PredictionNode(Node):
             
         self.x += delta_x
         self.y += delta_y
-        self.theta = (self.theta + w * dt + np.pi) % (2 * np.pi) - np.pi # نرمال‌سازی زاویه
+        self.theta = (self.theta + w * dt + np.pi) % (2 * np.pi) - np.pi
                 
-        # به‌روزرسانی کوواریانس (P)
         if abs(w) < 1e-6:
             F = np.array([
                 [1.0, 0.0, -v * dt * np.sin(self.theta)],
@@ -98,27 +91,24 @@ class PredictionNode(Node):
             ])
             
         Q = np.diag([
-            (self.process_noise_v * dt)**2 * np.cos(self.theta)**2,
-            (self.process_noise_v * dt)**2 * np.sin(self.theta)**2,
+            (self.process_noise_v * dt)**2,
+            (self.process_noise_v * dt)**2,
             (self.process_noise_w * dt)**2
         ])
         
         self.P = F @ self.P @ F.T + Q
 
-        # انتشار Odometry
         odom_msg = self.create_odometry_message()
         self.prediction_pub.publish(odom_msg)
         
-        # انتشار Path (جدید)
         self.publish_path()
 
-    def create_odometry_message(self):
+    def create_odometry_message(self) -> Odometry:
         odom = Odometry()
         odom.header.stamp = self.get_clock().now().to_msg()
         odom.header.frame_id = 'odom' 
-        odom.child_frame_id = 'base_link' # تغییر داده شد
+        odom.child_frame_id = 'base_link'
 
-        # موقعیت و جهت
         odom.pose.pose.position.x = self.x
         odom.pose.pose.position.y = self.y
         quaternion = tf_transformations.quaternion_from_euler(0, 0, self.theta)
@@ -127,23 +117,23 @@ class PredictionNode(Node):
         odom.pose.pose.orientation.z = quaternion[2]
         odom.pose.pose.orientation.w = quaternion[3]
         
-        # کوواریانس
-        cov = np.zeros((6, 6))
+        cov = np.diag([100.0] * 6)
         cov[0, 0] = self.P[0, 0]; cov[0, 1] = self.P[0, 1]
         cov[1, 0] = self.P[1, 0]; cov[1, 1] = self.P[1, 1]
-        cov[5, 5] = self.P[2, 2] # yaw-yaw
-        
-        # اصلاح کوواریانس برای Z, Roll, Pitch (به 100.0)
-        cov[2, 2] = 100.0
-        cov[3, 3] = 100.0
-        cov[4, 4] = 100.0
-        
+        cov[5, 5] = self.P[2, 2]
         odom.pose.covariance = cov.flatten().tolist()
+        
+        odom.twist.twist.linear.x = self.last_v
+        odom.twist.twist.angular.z = self.last_w
+
+        twist_cov = np.diag([100.0] * 6)
+        twist_cov[0, 0] = self.process_noise_v ** 2 
+        twist_cov[5, 5] = self.process_noise_w ** 2 
+        odom.twist.covariance = twist_cov.flatten().tolist()
         
         return odom
 
     def publish_path(self):
-        """اضافه کردن پوز فعلی به مسیر و انتشار آن."""
         pose_stamped = PoseStamped()
         pose_stamped.header.stamp = self.get_clock().now().to_msg()
         pose_stamped.header.frame_id = 'odom'
@@ -158,9 +148,6 @@ class PredictionNode(Node):
         pose_stamped.pose.orientation.w = quaternion[3]
         
         self.path_msg.poses.append(pose_stamped)
-        
-        # if len(self.path_msg.poses) > 100:
-        #     self.path_msg.poses.pop(0)
             
         self.path_pub.publish(self.path_msg)
 
