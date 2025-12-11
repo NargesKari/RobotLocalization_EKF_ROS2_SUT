@@ -134,6 +134,14 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}]
     )
 
+    measurement_node= Node(
+        package='robot_local_localization',
+        executable='measurement_node',
+        name='measurement_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
     rtabmap_vo_node = Node(
         package="rtabmap_odom",
         executable="rgbd_odometry",
@@ -169,5 +177,6 @@ def generate_launch_description():
         wheel_odom_node,
         motor_controller_node,
         motor_command_node,
-        prediction_node
+        prediction_node,
+        measurement_node
     ])
