@@ -109,7 +109,23 @@ def generate_launch_description():
         output='screen',
         parameters=[{'use_sim_time': True}]
     )
-    
+
+    motor_controller_node= Node(
+        package='robot_description',
+        executable='motor_controller_node',
+        name='motor_controller_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
+    motor_command_node= Node(
+        package='robot_description',
+        executable='motor_command_node',
+        name='motor_command_node',
+        output='screen',
+        parameters=[{'use_sim_time': True}]
+    )
+
     rtabmap_vo_node = Node(
         package="rtabmap_odom",
         executable="rgbd_odometry",
@@ -142,5 +158,7 @@ def generate_launch_description():
         frame_id_converter_node, 
         ekf_diff_imu_node,
         rtabmap_vo_node,
-        wheel_odom_node
+        wheel_odom_node,
+        motor_controller_node,
+        motor_command_node
     ])

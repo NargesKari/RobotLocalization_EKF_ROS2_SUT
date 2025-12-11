@@ -29,6 +29,17 @@ ament_target_dependencies(wheel_odom_node
   tf2_ros 
 )
 
+add_executable(motor_controller_node scripts/motor_controller.cpp)
+target_include_directories(motor_controller_node PRIVATE ${EIGEN3_INCLUDE_DIRS})
+ament_target_dependencies(motor_controller_node
+  nav_msgs
+  geometry_msgs
+  sensor_msgs
+  std_msgs 
+  tf2
+  tf2_ros 
+)
+
 add_executable(frame_id_converter_node scripts/frame_id_converter.cpp)
 ament_target_dependencies(frame_id_converter_node rclcpp sensor_msgs)
 
@@ -58,6 +69,7 @@ install(
     ekf_diff_imu_node
     motor_command_node
     wheel_odom_node
+    motor_controller_node
     DESTINATION lib/${PROJECT_NAME}
 )
 
