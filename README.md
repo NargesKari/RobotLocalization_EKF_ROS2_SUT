@@ -259,7 +259,7 @@ C. Controller Node Implementation (C++)
 * **Verification:** Control was verified by successfully executing motions in Gazebo by manually publishing `geometry_msgs/Twist` messages to `/cmd_vel`.
 
 > **Verification Screenshot:**
-> ![Manual control test via cmd_vel in terminal and observed robot motion in Gazebo](images/controller_verification.jpg)
+> ![Manual control test via cmd_vel in terminal and observed robot motion in Gazebo](images/c.png)
 ---
 ### D. Prediction Node Implementation (Python)
 
